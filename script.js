@@ -11,7 +11,7 @@ const inputElevation = document.querySelector(".form__input--elevation");
 class Workout {
   date = new Date();
   id = (Date.now() + "").slice(-10);
-  type = "running";
+  clicks = 0;
 
   constructor(coords, distance, duration) {
     this.coords = coords;
@@ -27,9 +27,15 @@ class Workout {
       months[this.date.getMonth()]
     } ${this.date.getDate()}`;
   }
+
+  click() {
+    this.clicks++;
+  }
 }
 
 class Running extends Workout {
+  type = "running";
+
   constructor(coords, distance, duration, cadence) {
     super(coords, distance, duration);
     this.cadence = cadence;
@@ -64,14 +70,15 @@ class Cycling extends Workout {
 
 class App {
   #map;
+  #mapZoomLevel = 13;
   #mapEvent;
-  #workout = [];
+  #workouts = [];
 
   constructor() {
     this._getPosition();
     form.addEventListener("submit", this._newWorkout.bind(this));
-
     inputType.addEventListener("change", this._toggleElevationField);
+    containerWorkouts.addEventListener("click", this._moveToPopup.bind(this));
   }
 
   _getPosition() {
@@ -88,11 +95,11 @@ class App {
   _loadMap(position) {
     const latitide = position.coords.latitude;
     const longitude = position.coords.longitude;
-    console.log(`https://www.google.pt/maps/@${latitide},${longitude}`);
+    // console.log(`https://www.google.pt/maps/@${latitide},${longitude}`);
 
     const coords = [latitide, longitude];
 
-    this.#map = L.map("map").setView(coords, 13);
+    this.#map = L.map("map").setView(coords, this.#mapZoomLevel);
 
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
@@ -100,6 +107,10 @@ class App {
     }).addTo(this.#map);
 
     this.#map.on("click", this._showForm.bind(this));
+
+    this.#workouts.forEach((work) => {
+      this._renderWorkoutMarker(work);
+    });
   }
 
   _showForm(mapE) {
@@ -155,6 +166,7 @@ class App {
         !allPositive(distance, duration, cadence)
       )
         return alert("Input have to be positive number");
+
       workout = new Running([lat, lng], distance, duration, cadence);
     }
 
@@ -173,7 +185,7 @@ class App {
     }
 
     // Add new object to workout array
-    this.#workout.push(workout);
+    this.#workouts.push(workout);
 
     // Render the workout on the map as a marker
 
@@ -207,7 +219,7 @@ class App {
 
   _renderWorkout(workout) {
     let html = `
-       <li class="workout workout--${workout.type}" data-id=${workout.date}>
+       <li class="workout workout--${workout.type}" data-id=${workout.id}>
           <h2 class="workout__title">${workout.description}</h2>
           <div class="workout__details">
             <span class="workout__icon">${
@@ -253,6 +265,30 @@ class App {
     }
 
     form.insertAdjacentHTML("afterend", html);
+  }
+
+  _moveToPopup(e) {
+    if (!this.#map) return;
+
+    const workoutEl = e.target.closest(".workout");
+    console.log(workoutEl);
+
+    if (!workoutEl) return;
+
+    const workout = this.#workouts.find(
+      (work) => work.id === workoutEl.dataset.id
+    );
+
+    console.log(workout);
+
+    this.#map.setView(workout.coords, this.#mapZoomLevel, {
+      animate: true,
+      pan: {
+        duration: 1,
+      },
+    });
+
+    workout.click();
   }
 }
 
